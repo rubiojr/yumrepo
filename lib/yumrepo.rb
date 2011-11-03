@@ -27,8 +27,7 @@ module YumRepo
 
   class Settings
     include Singleton
-    attr_accessor :cache_path, :cache_expire, :log_level
-    attr_reader :cache_enabled
+    attr_accessor :cache_path, :cache_expire, :log_level, :cache_enabled
 
     def initialize
       @cache_path = "#{ENV['HOME']}/.yumrepo/cache/"
@@ -68,19 +67,6 @@ module YumRepo
       end
       log.debug "Initializing settings"
       @initialized = true
-    end
-
-    def cache_enabled=(enabled)
-      @cache_enabled = enabled
-
-      if @cache_enabled
-        if not File.exist? @cache_path
-          log.debug "Creating cache path #{@cache_path}"
-          FileUtils.mkdir_p @cache_path
-        else
-          log.debug "Using cache path #{@cache_path}"
-        end
-      end
     end
   end
 
@@ -272,7 +258,6 @@ module YumRepo
   class PackageChangelog
     @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
     @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
-
 
     def initialize(xml)
       doc = Nokogiri::XML(@xml)
