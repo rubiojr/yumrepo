@@ -26,13 +26,14 @@ module YumRepo
 
   class Settings
     include Singleton
-    attr_accessor :cache_path, :cache_expire, :cache_enabled, :log_level
+    attr_accessor :cache_path, :cache_expire, :log_level
+    attr_reader :cache_enabled
 
     def initialize
       @cache_path = "#{ENV['HOME']}/.yumrepo/cache/"
       # Cache expire in seconds
       @cache_expire = 3600
-      @cache_enabled = true
+      @cache_enabled = false
       @initialized = false
       @log_level = :info
     end
@@ -40,7 +41,7 @@ module YumRepo
     def log_level=(level)
       case level
       when :warn
-        level = Logger::WARN 
+        level = Logger::WARN
       when :debug
         level = Logger::DEBUG
       when :info
@@ -66,13 +67,24 @@ module YumRepo
       end
       log.debug "Initializing settings"
       @initialized = true
-      log.debug "Creating cache path #{@cache_path}"
-      FileUtils.mkdir_p @cache_path if not File.exist? @cache_path
+    end
+
+    def cache_enabled=(enabled)
+      @cache_enabled = enabled
+
+      if @cache_enabled
+        if not File.exist? @cache_path
+          log.debug "Creating cache path #{@cache_path}"
+          FileUtils.mkdir_p @cache_path
+        else
+          log.debug "Using cache path #{@cache_path}"
+        end
+      end
     end
   end
 
   class Repomd
-    
+
     #
     # Rasises exception if can't retrieve repomd.xml
     #
@@ -111,7 +123,7 @@ module YumRepo
       end
       fl
     end
-    
+
     def primary
       pl = []
       @repomd.xpath("/xmlns:repomd/xmlns:data[@type=\"primary\"]/xmlns:location").each do |p|
@@ -133,6 +145,29 @@ module YumRepo
         end
       end
       @primary_xml
+    end
+
+    def other
+      pl = []
+      @repomd.xpath("/xmlns:repomd/xmlns:data[@type=\"other\"]/xmlns:location").each do |p|
+        pl << File.join(@url, p['href'])
+      end
+      @other_xml = File.join(@settings.cache_path, @url_digest, "other.xml.gz")
+      if File.exist?(@other_xml) and @settings.cache_enabled
+        @settings.log.debug "Using catched other.xml.gz at #{@other_xml}"
+        f = open @other_xml
+      else
+        @settings.log.debug "Fetching other.xml.gz from #{pl.first}"
+        f = open pl.first
+        if @settings.cache_enabled
+          FileUtils.mkdir_p File.join(@settings.cache_path, @url_digest)
+          @settings.log.debug "Caching other.xml.gz for #{@url} at #{@other_xml}"
+          File.open(@other_xml, 'w') do |xml|
+            xml.puts f.read
+          end
+        end
+      end
+      @other_xml
     end
   end
 
@@ -178,30 +213,126 @@ module YumRepo
     end
 
     def name
-      doc.xpath('/xmlns:package/xmlns:name').text
+      doc.xpath('/xmlns:package/xmlns:name').text.strip
+    end
+
+    def summary
+      doc.xpath('/xmlns:package/xmlns:summary').text.strip
+    end
+
+    def description
+      doc.xpath('/xmlns:package/xmlns:description').text.strip
+    end
+
+    def url
+      doc.xpath('/xmlns:package/xmlns:url').text.strip
+    end
+
+    def location
+      doc.xpath('/xmlns:package/xmlns:location/@href').text.strip
     end
 
     def version
-      doc.xpath('/xmlns:package/xmlns:version/@ver').text
+      doc.xpath('/xmlns:package/xmlns:version/@ver').text.strip
     end
-    def release 
-      doc.xpath('/xmlns:package/xmlns:version/@rel').text
+
+    def release
+      doc.xpath('/xmlns:package/xmlns:version/@rel').text.strip
+    end
+
+    def src_rpm
+      doc.xpath('/xmlns:package/xmlns:format/xmlns:sourcerpm').text.strip
+    end
+
+    def group
+      doc.xpath('/xmlns:package/xmlns:format/rpm:group').text.strip
+    end
+
+    def vendor
+      doc.xpath('/xmlns:package/xmlns:format/rpm:vendor').text.strip
+    end
+
+    def license
+      doc.xpath('/xmlns:package/xmlns:format/rpm:license').text.strip
     end
 
     def provides
       doc.xpath('/xmlns:package/xmlns:format/rpm:provides/rpm:entry').map do |pr|
         {
-          :name => pr.at_xpath('./@name').text
+          :name => pr.at_xpath('./@name').text.strip
         }
       end
     end
-    def requires 
+
+    def requires
       doc.xpath('/xmlns:package/xmlns:format/rpm:requires/rpm:entry').map do |pr|
         {
-          :name => pr.at_xpath('./@name').text
+          :name => pr.at_xpath('./@name').text.strip
         }
       end
     end
   end
+
+
+  class PackageChangelog
+    @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
+    @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
+
+
+    def initialize(xml)
+      doc = Nokogiri::XML(@xml)
+      puts doc.path
+      doc.xpath('/xmlns:package/xmlns:format/rpm:requires/rpm:entry').map do |pr|
+        {
+          :name => pr.at_xpath('./@name').text.strip
+        }
+      end
+    end
+
+    private
+
+    def _get_version_string(input)
+      m = @@version_regex_std.match(input)
+      return m[2].to_s.strip() if m
+
+      m = @@version_regex_odd.match(input)
+      return m[1].to_s.strip() if m
+    end
+
+  end
+
+  class Release
+    @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
+    @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
+
+    def initialize(xml)
+      @xml = xml
+    end
+
+    def doc
+      @doc ||= Nokogiri::XML(@xml)
+    end
+
+    def author
+      doc.xpath('/xmlns:changelog/@author').text.strip
+    end
+
+    def summary
+      doc.xpath('/xmlns:changelog').text.strip
+    end
+
+    def date
+      Time.at(doc.xpath('/xmlns:changelog/@date').text.strip)
+    end
+
+    def version
+      m = @@version_regex_std.match(self.author)
+      return m[2].to_s.strip() if m
+
+      m = @@version_regex_odd.match(self.author)
+      return m[1].to_s.strip() if m
+    end
+  end
+
 
 end
