@@ -254,19 +254,71 @@ module YumRepo
     end
   end
 
+  class PackageChangelogList
+    def initialize(url)
+      @url = url
+      @xml_file = Repomd.new(url).other
+      @changelogs = []
+
+      buf = ''
+      YumRepo.bench("Zlib::GzipReader.read") do
+        buf = Zlib::GzipReader.new(@xml_file).read
+      end
+
+      YumRepo.bench("Building PackageChangelog Objects") do
+        d = Nokogiri::XML::Reader(buf)
+        d.each do |n|
+          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
+            @changelogs << PackageChangelog.new(n.outer_xml)
+          end
+        end
+      end
+    end
+
+    def each
+      all.each do |p|
+        yield p
+      end
+    end
+
+    def all
+      @changelogs
+    end
+  end
+
 
   class PackageChangelog
+    attr_reader :current_version, :current_release, :name, :arch
+
     @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
     @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
 
     def initialize(xml)
-      doc = Nokogiri::XML(@xml)
-      puts doc.path
-      doc.xpath('/xmlns:package/xmlns:format/rpm:requires/rpm:entry').map do |pr|
+      doc = Nokogiri::XML(xml)
+      doc.remove_namespaces!
+      @name = doc.xpath('/package/@name').text.strip
+      @arch = doc.xpath('/package/@arch').text.strip
+      @current_version = doc.xpath('/package/version/@ver').text.strip
+      @current_release = doc.xpath('/package/version/@rel').text.strip
+
+      @releases = doc.xpath('/package/changelog').map do |pr|
         {
-          :name => pr.at_xpath('./@name').text.strip
+          :author => pr.at_xpath('./@author').text.strip,
+          :version => _get_version_string(pr.at_xpath('./@author').text),
+          :date => Time.at(pr.at_xpath('./@date').text.strip.to_i),
+          :summary => pr.text.sub(/^- /, '')
         }
       end
+    end
+
+    def each
+      all.each do |r|
+        yield r
+      end
+    end
+
+    def all
+      @releases
     end
 
     private
@@ -279,39 +331,6 @@ module YumRepo
       return m[1].to_s.strip() if m
     end
 
-  end
-
-  class Release
-    @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
-    @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
-
-    def initialize(xml)
-      @xml = xml
-    end
-
-    def doc
-      @doc ||= Nokogiri::XML(@xml)
-    end
-
-    def author
-      doc.xpath('/xmlns:changelog/@author').text.strip
-    end
-
-    def summary
-      doc.xpath('/xmlns:changelog').text.strip
-    end
-
-    def date
-      Time.at(doc.xpath('/xmlns:changelog/@date').text.strip)
-    end
-
-    def version
-      m = @@version_regex_std.match(self.author)
-      return m[2].to_s.strip() if m
-
-      m = @@version_regex_odd.match(self.author)
-      return m[1].to_s.strip() if m
-    end
   end
 
 

@@ -6,6 +6,7 @@ describe YumRepo do
 
   FakeWeb.register_uri(:get, "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS/repodata/repomd.xml", :body => File.read("spec/test_data/repomd.xml"))
   FakeWeb.register_uri(:get, "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS/repodata/primary.xml.gz", :body => File.read("spec/test_data/primary.xml.gz"))
+  FakeWeb.register_uri(:get, "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS/repodata/other.xml.gz", :body => File.read("spec/test_data/other.xml.gz"))
   YumRepo::Settings.instance.log_level = :error
   YumRepo::Settings.instance.cache_enabled = false
 
@@ -153,6 +154,51 @@ describe YumRepo do
     after :each do
       YumRepo::Settings.instance.cache_enabled = false
       FileUtils.remove_entry_secure(@cache_dir) if File.exist?(@cache_dir)
+    end
+  end
+
+  describe "package changelog list" do
+    it "for test_data should have 2 entries with 73 and 18 entries respectivly" do
+      pl = YumRepo::PackageChangelogList.new "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS"
+      pl.all.length.should == 2
+      pl.all.first.all.length.should == 73
+      pl.all.last.all.length.should == 18
+    end
+  end
+
+  describe "parse package changelog" do
+    before :each do
+      @pl = YumRepo::PackageChangelogList.new "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS"
+      @first = @pl.all.first
+      @last = @pl.all.last
+    end
+
+    it "first change log should have a name" do
+      @first.name.should == "readline"
+    end
+
+    it "first change log should have an arch" do
+      @first.arch.should == "src"
+    end
+
+    it "first change log should have a current version" do
+      @first.current_version.should == "6.0"
+    end
+
+    it "first change log should have a current release" do
+      @first.current_release.should == "3.el6"
+    end
+
+    it "first entry of first changelog should have an author" do
+      @first.all.first[:author].should == "Miroslav Lichvar <mlichvar@redhat.com> 6.0-3"
+    end
+
+    it "first entry of first changelog should have a version" do
+      @first.all.first[:version].should == "6.0-3"
+    end
+
+    it "first entry of first changelog should have a date" do
+      @first.all.first[:date].should == Time.at(1251201600)
     end
   end
 end
