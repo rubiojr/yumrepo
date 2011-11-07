@@ -8,6 +8,7 @@ require 'singleton'
 require 'digest/md5'
 require 'fileutils'
 require 'logger'
+require 'tempfile'
 
 module YumRepo
 
@@ -26,13 +27,13 @@ module YumRepo
 
   class Settings
     include Singleton
-    attr_accessor :cache_path, :cache_expire, :cache_enabled, :log_level
+    attr_accessor :cache_path, :cache_expire, :log_level, :cache_enabled
 
     def initialize
       @cache_path = "#{ENV['HOME']}/.yumrepo/cache/"
       # Cache expire in seconds
       @cache_expire = 3600
-      @cache_enabled = true
+      @cache_enabled = false
       @initialized = false
       @log_level = :info
     end
@@ -40,7 +41,7 @@ module YumRepo
     def log_level=(level)
       case level
       when :warn
-        level = Logger::WARN 
+        level = Logger::WARN
       when :debug
         level = Logger::DEBUG
       when :info
@@ -66,13 +67,11 @@ module YumRepo
       end
       log.debug "Initializing settings"
       @initialized = true
-      log.debug "Creating cache path #{@cache_path}"
-      FileUtils.mkdir_p @cache_path if not File.exist? @cache_path
     end
   end
 
   class Repomd
-    
+
     #
     # Rasises exception if can't retrieve repomd.xml
     #
@@ -86,7 +85,7 @@ module YumRepo
       @url_digest = Digest::MD5.hexdigest(@url)
       @repomd_file = File.join(@settings.cache_path, @url_digest, 'repomd.xml')
 
-      if File.exist?(@repomd_file) and @settings.cache_enabled
+      if @settings.cache_enabled and File.exist?(@repomd_file)
         @settings.log.debug "Using catched repomd.xml at #{@repomd_file}"
         f = open @repomd_file
       else
@@ -111,36 +110,67 @@ module YumRepo
       end
       fl
     end
-    
+
     def primary
       pl = []
       @repomd.xpath("/xmlns:repomd/xmlns:data[@type=\"primary\"]/xmlns:location").each do |p|
         pl << File.join(@url, p['href'])
       end
-      @primary_xml = File.join(@settings.cache_path, @url_digest, "primary.xml.gz")
-      if File.exist?(@primary_xml) and @settings.cache_enabled
-        @settings.log.debug "Using catched primary.xml.gz at #{@primary_xml}"
-        f = open @primary_xml
-      else
-        @settings.log.debug "Fetching primary.xml.gz from #{pl.first}"
-        f = open pl.first
-        if @settings.cache_enabled
-          FileUtils.mkdir_p File.join(@settings.cache_path, @url_digest)
-          @settings.log.debug "Caching primary.xml.gz for #{@url} at #{@primary_xml}"
-          File.open(@primary_xml, 'w') do |xml|
-            xml.puts f.read
-          end
-        end
-      end
+
+      @primary_xml ||= _open_file("primary.xml.gz", @url_digest, pl.first)
       @primary_xml
     end
+
+    def other
+      pl = []
+      @repomd.xpath("/xmlns:repomd/xmlns:data[@type=\"other\"]/xmlns:location").each do |p|
+        pl << File.join(@url, p['href'])
+      end
+
+      @other_xml ||= _open_file("other.xml.gz", @url_digest, pl.first)
+      @other_xml
+    end
+
+    private
+    def _open_file(filename, cache_dir_name, data_url)
+      cache_file_name = File.join(@settings.cache_path, cache_dir_name, filename)
+
+      if @settings.cache_enabled and File.exist?(cache_file_name) and File.mtime(cache_file_name) > Time.now() - @settings.cache_expire
+        @settings.log.debug "Using catched #{filename} at #{cache_file_name}"
+        return File.open(cache_file_name, 'r')
+      end
+
+      FileUtils.mkdir_p File.join(@settings.cache_path, cache_dir_name) if @settings.cache_enabled
+      f = File.open(cache_file_name, "w+") if @settings.cache_enabled
+      f ||= Tempfile.new(filename)
+      @settings.log.debug "Caching #{filename} for #{data_url} at #{f.path}"
+      f.puts open(data_url).read
+      f.pos = 0
+      return f
+    end
+
   end
 
   class PackageList
 
     def initialize(url)
       @url = url
-      @xml_file = open(Repomd.new(url).primary)
+      @xml_file = Repomd.new(url).primary
+      @packages = []
+
+      buf = ''
+      YumRepo.bench("Zlib::GzipReader.read") do
+        buf = Zlib::GzipReader.new(@xml_file).read
+      end
+
+      YumRepo.bench("Building Package Objects") do
+        d = Nokogiri::XML::Reader(buf)
+        d.each do |n|
+          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
+            @packages << Package.new(n.outer_xml)
+          end
+        end
+      end
     end
 
     def each
@@ -150,21 +180,7 @@ module YumRepo
     end
 
     def all
-      buf = ''
-      YumRepo.bench("Zlib::GzipReader.read") do
-        buf = Zlib::GzipReader.new(@xml_file).read
-      end
-
-      packages = []
-      YumRepo.bench("Building Package Objects") do
-        d = Nokogiri::XML::Reader(buf)
-        d.each do |n|
-          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
-            packages << Package.new(n.outer_xml)
-          end
-        end
-      end
-      packages
+      @packages
     end
   end
 
@@ -178,30 +194,144 @@ module YumRepo
     end
 
     def name
-      doc.xpath('/xmlns:package/xmlns:name').text
+      doc.xpath('/xmlns:package/xmlns:name').text.strip
+    end
+
+    def summary
+      doc.xpath('/xmlns:package/xmlns:summary').text.strip
+    end
+
+    def description
+      doc.xpath('/xmlns:package/xmlns:description').text.strip
+    end
+
+    def url
+      doc.xpath('/xmlns:package/xmlns:url').text.strip
+    end
+
+    def location
+      doc.xpath('/xmlns:package/xmlns:location/@href').text.strip
     end
 
     def version
-      doc.xpath('/xmlns:package/xmlns:version/@ver').text
+      doc.xpath('/xmlns:package/xmlns:version/@ver').text.strip
     end
-    def release 
-      doc.xpath('/xmlns:package/xmlns:version/@rel').text
+
+    def release
+      doc.xpath('/xmlns:package/xmlns:version/@rel').text.strip
+    end
+
+    def src_rpm
+      doc.xpath('/xmlns:package/xmlns:format/rpm:sourcerpm').text.strip
+    end
+
+    def group
+      doc.xpath('/xmlns:package/xmlns:format/rpm:group').text.strip
+    end
+
+    def vendor
+      doc.xpath('/xmlns:package/xmlns:format/rpm:vendor').text.strip
+    end
+
+    def license
+      doc.xpath('/xmlns:package/xmlns:format/rpm:license').text.strip
     end
 
     def provides
       doc.xpath('/xmlns:package/xmlns:format/rpm:provides/rpm:entry').map do |pr|
         {
-          :name => pr.at_xpath('./@name').text
+          :name => pr.at_xpath('./@name').text.strip
         }
       end
     end
-    def requires 
+
+    def requires
       doc.xpath('/xmlns:package/xmlns:format/rpm:requires/rpm:entry').map do |pr|
         {
-          :name => pr.at_xpath('./@name').text
+          :name => pr.at_xpath('./@name').text.strip
         }
       end
     end
   end
+
+  class PackageChangelogList
+    def initialize(url)
+      @url = url
+      @xml_file = Repomd.new(url).other
+      @changelogs = []
+
+      buf = ''
+      YumRepo.bench("Zlib::GzipReader.read") do
+        buf = Zlib::GzipReader.new(@xml_file).read
+      end
+
+      YumRepo.bench("Building PackageChangelog Objects") do
+        d = Nokogiri::XML::Reader(buf)
+        d.each do |n|
+          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
+            @changelogs << PackageChangelog.new(n.outer_xml)
+          end
+        end
+      end
+    end
+
+    def each
+      all.each do |p|
+        yield p
+      end
+    end
+
+    def all
+      @changelogs
+    end
+  end
+
+
+  class PackageChangelog
+    attr_reader :current_version, :current_release, :name, :arch
+
+    @@version_regex_std = /(^|\:|\s+|v|r|V|R)(([0-9]+\.){1,10}[a-zA-Z0-9\-]+)/
+    @@version_regex_odd = /(([a-zA-Z0-9\-]+)\-[a-zA-Z0-9\-]{1,10})/
+
+    def initialize(xml)
+      doc = Nokogiri::XML(xml)
+      doc.remove_namespaces!
+      @name = doc.xpath('/package/@name').text.strip
+      @arch = doc.xpath('/package/@arch').text.strip
+      @current_version = doc.xpath('/package/version/@ver').text.strip
+      @current_release = doc.xpath('/package/version/@rel').text.strip
+
+      @releases = doc.xpath('/package/changelog').map do |pr|
+        {
+          :author => pr.at_xpath('./@author').text.strip,
+          :version => _get_version_string(pr.at_xpath('./@author').text),
+          :date => Time.at(pr.at_xpath('./@date').text.strip.to_i),
+          :summary => pr.text.sub(/^- /, '')
+        }
+      end
+    end
+
+    def each
+      all.each do |r|
+        yield r
+      end
+    end
+
+    def all
+      @releases
+    end
+
+    private
+
+    def _get_version_string(input)
+      m = @@version_regex_std.match(input)
+      return m[2].to_s.strip() if m
+
+      m = @@version_regex_odd.match(input)
+      return m[1].to_s.strip() if m
+    end
+
+  end
+
 
 end
