@@ -1,6 +1,6 @@
 require 'rubygems'
 require 'rake'
-require 'lib/yumrepo'
+require './lib/yumrepo'
 
 require 'jeweler'
 Jeweler::Tasks.new do |gem|

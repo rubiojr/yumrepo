@@ -33,7 +33,7 @@ module YumRepo
       @cache_path = "#{ENV['HOME']}/.yumrepo/cache/"
       # Cache expire in seconds
       @cache_expire = 3600
-      @cache_enabled = false
+      @cache_enabled = true
       @initialized = false
       @log_level = :info
     end
