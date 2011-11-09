@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "yumrepo"
-  s.version = "0.1"
+  s.version = "0.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Sergio Rubio"]
-  s.date = "2011-11-07"
+  s.date = "2011-11-09"
   s.description = "YUM Repository Metadata handling library"
   s.email = "rubiojr@frameos.org"
   s.extra_rdoc_files = [
@@ -31,7 +31,8 @@ Gem::Specification.new do |s|
     "spec/test_data/other.xml.gz",
     "spec/test_data/primary.xml.gz",
     "spec/test_data/repomd.xml",
-    "spec/yumrepo_spec.rb"
+    "spec/yumrepo_spec.rb",
+    "yumrepo.gemspec"
   ]
   s.homepage = "http://github.com/rubiojr/yumrepo"
   s.licenses = ["MIT"]
@@ -48,12 +49,18 @@ Gem::Specification.new do |s|
       s.add_development_dependency(%q<jeweler>, ["~> 1.5.2"])
       s.add_development_dependency(%q<guard>, [">= 0"])
       s.add_runtime_dependency(%q<nokogiri>, [">= 0"])
+      s.add_development_dependency(%q<rspec>, [">= 0"])
+      s.add_development_dependency(%q<simplecov>, [">= 0"])
+      s.add_development_dependency(%q<fakeweb>, [">= 0"])
     else
       s.add_dependency(%q<nokogiri>, ["~> 1.5.0"])
       s.add_dependency(%q<bundler>, ["~> 1.0.0"])
       s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
       s.add_dependency(%q<guard>, [">= 0"])
       s.add_dependency(%q<nokogiri>, [">= 0"])
+      s.add_dependency(%q<rspec>, [">= 0"])
+      s.add_dependency(%q<simplecov>, [">= 0"])
+      s.add_dependency(%q<fakeweb>, [">= 0"])
     end
   else
     s.add_dependency(%q<nokogiri>, ["~> 1.5.0"])
@@ -61,6 +68,9 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
     s.add_dependency(%q<guard>, [">= 0"])
     s.add_dependency(%q<nokogiri>, [">= 0"])
+    s.add_dependency(%q<rspec>, [">= 0"])
+    s.add_dependency(%q<simplecov>, [">= 0"])
+    s.add_dependency(%q<fakeweb>, [">= 0"])
   end
 end
 
