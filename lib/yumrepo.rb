@@ -143,6 +143,7 @@ module YumRepo
       FileUtils.mkdir_p File.join(@settings.cache_path, cache_dir_name) if @settings.cache_enabled
       f = File.open(cache_file_name, "w+") if @settings.cache_enabled
       f ||= Tempfile.new(filename)
+      f.binmode
       @settings.log.debug "Caching #{filename} for #{data_url} at #{f.path}"
       f.puts open(data_url).read
       f.pos = 0
