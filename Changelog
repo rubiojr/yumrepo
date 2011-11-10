@@ -1,0 +1,6 @@
+* Thu Nov 10 2011 - 0.2
+- Beefier than ever thanks to @mstump
+- Tests now cover most of the code
+- yumrepo catching code bugfixes
+- Improved ruby 1.9 compatibility
+- New methods and classes added to cover missing functionality
