@@ -12,7 +12,7 @@ require 'tempfile'
 
 module YumRepo
 
-  VERSION = '0.1'
+  VERSION = '0.2'
 
   def self.bench(msg)
     if defined? $yumrepo_perf_debug
