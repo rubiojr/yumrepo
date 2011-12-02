@@ -117,7 +117,9 @@ module YumRepo
         pl << File.join(@url, p['href'])
       end
 
-      @primary_xml ||= _open_file("primary.xml.gz", @url_digest, pl.first)
+      if not @primary_xml or @primary_xml.closed?
+        @primary_xml = _open_file("primary.xml.gz", @url_digest, pl.first)
+      end
       @primary_xml
     end
 
@@ -127,7 +129,9 @@ module YumRepo
         pl << File.join(@url, p['href'])
       end
 
-      @other_xml ||= _open_file("other.xml.gz", @url_digest, pl.first)
+      if not @other_xml or @other_xml.closed?
+        @other_xml = _open_file("other.xml.gz", @url_digest, pl.first)
+      end
       @other_xml
     end
 
@@ -141,8 +145,13 @@ module YumRepo
       end
 
       FileUtils.mkdir_p File.join(@settings.cache_path, cache_dir_name) if @settings.cache_enabled
-      f = File.open(cache_file_name, "w+") if @settings.cache_enabled
-      f ||= Tempfile.new(filename)
+      if @settings.cache_enabled
+        f = File.open(cache_file_name, "w+")
+      else
+        f = Tempfile.new(filename)
+        f.unlink # see tempfile documentation
+      end
+
       f.binmode
       @settings.log.debug "Caching #{filename} for #{data_url} at #{f.path}"
       f.puts open(data_url).read
@@ -156,22 +165,32 @@ module YumRepo
 
     def initialize(url)
       @url = url
-      @xml_file = Repomd.new(url).primary
       @packages = []
+      xml_file = Repomd.new(url).primary
 
-      buf = ''
-      YumRepo.bench("Zlib::GzipReader.read") do
-        buf = Zlib::GzipReader.new(@xml_file).read
-      end
+      begin
+        buf = ''
+        YumRepo.bench("Zlib::GzipReader.read") do
+          buf = Zlib::GzipReader.new(xml_file).read
+        end
 
-      YumRepo.bench("Building Package Objects") do
-        d = Nokogiri::XML::Reader(buf)
-        d.each do |n|
-          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
-            @packages << Package.new(n.outer_xml)
+        YumRepo.bench("Building Package Objects") do
+          d = Nokogiri::XML::Reader(buf)
+          d.each do |n|
+            if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
+              @packages << Package.new(n.outer_xml)
+            end
           end
         end
+
+      ensure
+        if xml_file.respond_to?(:close!)
+          xml_file.close!
+        else
+          xml_file.close
+        end
       end
+
     end
 
     def each
@@ -258,20 +277,29 @@ module YumRepo
   class PackageChangelogList
     def initialize(url)
       @url = url
-      @xml_file = Repomd.new(url).other
       @changelogs = []
+      xml_file = Repomd.new(url).other
 
-      buf = ''
-      YumRepo.bench("Zlib::GzipReader.read") do
-        buf = Zlib::GzipReader.new(@xml_file).read
-      end
+      begin
+        buf = ''
+        YumRepo.bench("Zlib::GzipReader.read") do
+          buf = Zlib::GzipReader.new(xml_file).read
+        end
 
-      YumRepo.bench("Building PackageChangelog Objects") do
-        d = Nokogiri::XML::Reader(buf)
-        d.each do |n|
-          if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
-            @changelogs << PackageChangelog.new(n.outer_xml)
+        YumRepo.bench("Building PackageChangelog Objects") do
+          d = Nokogiri::XML::Reader(buf)
+          d.each do |n|
+            if n.name == 'package' and not n.node_type == Nokogiri::XML::Reader::TYPE_END_ELEMENT
+              @changelogs << PackageChangelog.new(n.outer_xml)
+            end
           end
+        end
+
+      ensure
+        if xml_file.respond_to?(:close!)
+          xml_file.close!
+        else
+          xml_file.close
         end
       end
     end
