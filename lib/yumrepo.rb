@@ -9,6 +9,7 @@ require 'digest/md5'
 require 'fileutils'
 require 'logger'
 require 'tempfile'
+require 'active_support/core_ext'
 
 module YumRepo
 
@@ -121,6 +122,24 @@ module YumRepo
         @primary_xml = _open_file("primary.xml.gz", @url_digest, pl.first)
       end
       @primary_xml
+    end
+
+    def meta
+      def to_sym(h)
+        h.inject({}) { |result, (key, value)|
+          new_key = case key
+                    when String then key.to_sym
+                    else key
+                    end
+          new_value = case value
+                      when Hash then to_sym(value)
+                      else value
+                      end
+          result[new_key] = new_value
+          result
+        }
+      end
+      Hash[Hash.from_xml(@repomd.to_s)["repomd"]["data"].map {|h| [h["type"].to_sym, to_sym(h)] }]
     end
 
     def other
