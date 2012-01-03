@@ -10,6 +10,15 @@ describe YumRepo do
   YumRepo::Settings.instance.log_level = :error
   YumRepo::Settings.instance.cache_enabled = false
 
+
+  describe "meta" do
+    it "make sure we get a hash whose keys are symbols" do
+      repo = YumRepo::Repomd.new "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS"
+      repo.meta[:primary].should_not == nil
+      repo.meta[:primary][:checksum].should == "7ae73bdcb5961b03a0ca22419bd8da19ddc8c241"
+    end
+  end
+
   describe "package list" do
     it "for test_data should have 5 entries" do
       pl = YumRepo::PackageList.new "http://centos.mirror.freedomvoice.com/6.0/os/SRPMS"
