@@ -10,6 +10,8 @@ group :development do
   gem 'nokogiri', '~> 1.5.0'
   gem 'bundler', '~> 1.0.0'
   gem 'jeweler', '~> 1.5.2'
+  gem 'i18n'
+  gem 'active_support'
   gem 'guard'
 end
 
