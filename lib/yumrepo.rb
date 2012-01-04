@@ -13,7 +13,7 @@ require 'active_support/core_ext'
 
 module YumRepo
 
-  VERSION = '0.2'
+  VERSION = '0.2.1'
 
   def self.bench(msg)
     if defined? $yumrepo_perf_debug

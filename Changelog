@@ -1,3 +1,7 @@
+* Wed Jan 04 2012 - 0.2.1
+- @mstump: fixing tempfile leak for long running processes, exposed repo
+metadata (https://github.com/rubiojr/yumrepo/pull/4)
+
 * Thu Nov 10 2011 - 0.2
 - Beefier than ever thanks to @mstump
 - Tests now cover most of the code

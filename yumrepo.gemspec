@@ -5,25 +5,26 @@
 
 Gem::Specification.new do |s|
   s.name = "yumrepo"
-  s.version = "0.2"
+  s.version = "0.2.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Sergio Rubio"]
-  s.date = "2011-11-09"
+  s.date = "2012-01-04"
   s.description = "YUM Repository Metadata handling library"
   s.email = "rubiojr@frameos.org"
   s.extra_rdoc_files = [
     "LICENSE.txt",
-    "README.rdoc"
+    "README.md"
   ]
   s.files = [
     ".document",
     ".rspec",
+    "Changelog",
     "Gemfile",
     "Gemfile.lock",
     "Guardfile",
     "LICENSE.txt",
-    "README.rdoc",
+    "README.md",
     "Rakefile",
     "examples/basic.rb",
     "lib/yumrepo.rb",
@@ -47,6 +48,8 @@ Gem::Specification.new do |s|
       s.add_development_dependency(%q<nokogiri>, ["~> 1.5.0"])
       s.add_development_dependency(%q<bundler>, ["~> 1.0.0"])
       s.add_development_dependency(%q<jeweler>, ["~> 1.5.2"])
+      s.add_development_dependency(%q<i18n>, [">= 0"])
+      s.add_development_dependency(%q<active_support>, [">= 0"])
       s.add_development_dependency(%q<guard>, [">= 0"])
       s.add_runtime_dependency(%q<nokogiri>, [">= 0"])
       s.add_development_dependency(%q<rspec>, [">= 0"])
@@ -56,6 +59,8 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<nokogiri>, ["~> 1.5.0"])
       s.add_dependency(%q<bundler>, ["~> 1.0.0"])
       s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
+      s.add_dependency(%q<i18n>, [">= 0"])
+      s.add_dependency(%q<active_support>, [">= 0"])
       s.add_dependency(%q<guard>, [">= 0"])
       s.add_dependency(%q<nokogiri>, [">= 0"])
       s.add_dependency(%q<rspec>, [">= 0"])
@@ -66,6 +71,8 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<nokogiri>, ["~> 1.5.0"])
     s.add_dependency(%q<bundler>, ["~> 1.0.0"])
     s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
+    s.add_dependency(%q<i18n>, [">= 0"])
+    s.add_dependency(%q<active_support>, [">= 0"])
     s.add_dependency(%q<guard>, [">= 0"])
     s.add_dependency(%q<nokogiri>, [">= 0"])
     s.add_dependency(%q<rspec>, [">= 0"])
