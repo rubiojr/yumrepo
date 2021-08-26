@@ -91,7 +91,7 @@ module YumRepo
         f = open @repomd_file
       else
         @settings.log.debug "Fetching repomd.xml from #{@url}"
-        f = open "#{@url}/repodata/repomd.xml"
+        f = URI.open "#{@url}/repodata/repomd.xml"
         if @settings.cache_enabled
           FileUtils.mkdir_p File.join(@settings.cache_path, @url_digest)
           @settings.log.debug "Caching repomd.xml for #{@url} at #{@repomd_file}"
@@ -173,7 +173,7 @@ module YumRepo
 
       f.binmode
       @settings.log.debug "Caching #{filename} for #{data_url} at #{f.path}"
-      f.puts open(data_url).read
+      f.puts URI.open(data_url).read
       f.pos = 0
       return f
     end
