@@ -276,6 +276,10 @@ module YumRepo
       doc.xpath('/xmlns:package/xmlns:format/rpm:license').text.strip
     end
 
+    def checksum
+      doc.xpath('/xmlns:package/xmlns:checksum').text.strip
+    end
+
     def provides
       doc.xpath('/xmlns:package/xmlns:format/rpm:provides/rpm:entry').map do |pr|
         {
