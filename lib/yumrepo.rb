@@ -244,6 +244,10 @@ module YumRepo
       doc.xpath('/xmlns:package/xmlns:description').text.strip
     end
 
+    def arch
+      doc.xpath('/xmlns:package/xmlns:arch').text.strip
+    end
+
     def url
       doc.xpath('/xmlns:package/xmlns:url').text.strip
     end
