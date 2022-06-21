@@ -252,6 +252,10 @@ module YumRepo
       doc.xpath('/xmlns:package/xmlns:location/@href').text.strip
     end
 
+    def epoch
+      doc.xpath('/xmlns:package/xmlns:version/@epoch').text.strip
+    end
+
     def version
       doc.xpath('/xmlns:package/xmlns:version/@ver').text.strip
     end
