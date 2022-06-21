@@ -9,6 +9,7 @@ require 'digest/md5'
 require 'fileutils'
 require 'logger'
 require 'tempfile'
+require 'active_support'
 require 'active_support/core_ext'
 
 module YumRepo
